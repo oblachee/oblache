@@ -2,119 +2,151 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Cute 3D Game for My Love</title>
+<title>Memory Chase</title>
 <style>
-  body { margin: 0; overflow: hidden; background: #ffeef0; font-family: sans-serif;}
-  #scoreboard { position: absolute; top: 20px; left: 20px; color: #ff4b7a; font-size: 24px; font-weight: bold;}
-  #message { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-             font-size: 32px; color: #ff4b7a; text-align: center; display: none;}
+  body { margin: 0; overflow: hidden; background: #ffeef0; font-family: sans-serif; }
+  canvas { display: block; margin: 0 auto; background: #fce4ec; }
+  #score { position: absolute; top: 20px; left: 20px; font-size: 24px; color: #ff4b7a; font-weight: bold; }
 </style>
 </head>
 <body>
-<div id="scoreboard">Score: 0</div>
-<div id="message">You did it! 💖</div>
+<div id="score">Memories: 0</div>
+<canvas id="gameCanvas" width="800" height="400"></canvas>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/examples/js/controls/PointerLockControls.js"></script>
 <script>
-// --- Scene setup ---
-let scene = new THREE.Scene();
-scene.background = new THREE.Color(0xfff0f5);
+// --- Canvas setup ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
 
-let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-camera.position.set(0,2,5); // move camera above ground and back a bit
+// --- Player setup ---
+const player = {
+  x: 50,
+  y: 300,
+  width: 40,
+  height: 40,
+  color: '#ff4b7a',
+  speed: 5
+};
 
-let renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
+// --- Game variables ---
+let memoriesCollected = 0;
+const memoriesToCollect = 5;
+const memoryImages = [];
+const memoryPositions = [];
+let gameState = 'running'; // 'running' or 'boss'
+const projectiles = [];
+let boss = { x: 600, y: 250, width: 80, height: 80, color:'#800000', health:5 };
 
-// --- Lighting ---
-let light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.5);
-scene.add(light);
-
-// --- Ground ---
-let groundGeo = new THREE.PlaneGeometry(50, 50);
-let groundMat = new THREE.MeshStandardMaterial({color: 0xffe0f0});
-let ground = new THREE.Mesh(groundGeo, groundMat);
-ground.rotation.x = -Math.PI/2;
-ground.position.y = 0;
-scene.add(ground);
-
-// --- Pointer lock controls ---
-let controls = new THREE.PointerLockControls(camera, document.body);
-document.body.addEventListener('click', () => { controls.lock(); });
-
-let move = {forward:0, backward:0, left:0, right:0};
-let velocity = new THREE.Vector3();
-
-document.addEventListener('keydown', (e)=> {
-  if(e.code==='KeyW') move.forward=1;
-  if(e.code==='KeyS') move.backward=1;
-  if(e.code==='KeyA') move.left=1;
-  if(e.code==='KeyD') move.right=1;
-});
-document.addEventListener('keyup', (e)=> {
-  if(e.code==='KeyW') move.forward=0;
-  if(e.code==='KeyS') move.backward=0;
-  if(e.code==='KeyA') move.left=0;
-  if(e.code==='KeyD') move.right=0;
-});
-
-// --- Hearts ---
-let hearts = [];
-let heartGeometry = new THREE.SphereGeometry(0.5,16,16);
-let heartMaterial = new THREE.MeshStandardMaterial({color:0xff4b7a});
-for(let i=0;i<5;i++){
-  let heart = new THREE.Mesh(heartGeometry, heartMaterial);
-  heart.position.set(Math.random()*20-10,0.5,Math.random()*20-10);
-  scene.add(heart);
-  hearts.push(heart);
+// --- Load memory images ---
+for(let i=1;i<=memoriesToCollect;i++){
+  let img = new Image();
+  img.src = `memory${i}.png`; // Put your images in the same folder
+  memoryImages.push(img);
+  memoryPositions.push({
+    x: Math.random()*600 + 100,
+    y: 250
+  });
 }
 
-// --- Score ---
-let score = 0;
-let scoreboard = document.getElementById('scoreboard');
-let messageDiv = document.getElementById('message');
+// --- Input ---
+const keys = {};
+document.addEventListener('keydown', e => keys[e.code] = true);
+document.addEventListener('keyup', e => keys[e.code] = false);
 
-// --- Animation loop ---
-let clock = new THREE.Clock();
-function animate(){
-  requestAnimationFrame(animate);
-  let delta = clock.getDelta();
+// Shoot projectiles
+document.addEventListener('keydown', e => {
+  if(gameState==='boss' && e.code==='Space'){
+    projectiles.push({x: player.x+player.width, y: player.y+player.height/2, width:60, height:20, text:'CHEATER'});
+  }
+});
 
-  // Move player
-  velocity.set(0,0,0);
-  if(move.forward) velocity.z -= 5*delta;
-  if(move.backward) velocity.z += 5*delta;
-  if(move.left) velocity.x -=5*delta;
-  if(move.right) velocity.x +=5*delta;
-  controls.moveRight(velocity.x);
-  controls.moveForward(velocity.z);
+// --- Game loop ---
+function update(){
+  // --- Player movement ---
+  if(keys['ArrowLeft'] && player.x>0) player.x -= player.speed;
+  if(keys['ArrowRight'] && player.x+player.width<canvas.width) player.x += player.speed;
 
-  // Check collisions with hearts
-  for(let i=hearts.length-1;i>=0;i--){
-    let h = hearts[i];
-    if(camera.position.distanceTo(h.position)<1){
-      scene.remove(h);
-      hearts.splice(i,1);
-      score++;
-      scoreboard.innerText = "Score: "+score;
-      if(score ===5){
-        messageDiv.style.display='block';
+  // --- Collect memories ---
+  if(gameState==='running'){
+    for(let i=memoryPositions.length-1;i>=0;i--){
+      let mem = memoryPositions[i];
+      if(player.x < mem.x+30 && player.x+player.width > mem.x &&
+         player.y < mem.y+30 && player.y+player.height > mem.y){
+        memoryPositions.splice(i,1);
+        memoriesCollected++;
+        document.getElementById('score').innerText = `Memories: ${memoriesCollected}`;
+        if(memoriesCollected === memoriesToCollect){
+          gameState = 'boss';
+          document.getElementById('score').innerText = `Boss Fight! Health: ${boss.health}`;
+        }
       }
     }
   }
 
-  renderer.render(scene,camera);
-}
-animate();
+  // --- Boss fight ---
+  if(gameState==='boss'){
+    // Move boss left/right automatically
+    boss.x += Math.sin(Date.now()/500)*2;
 
-// --- Window resize ---
-window.addEventListener('resize', ()=> {
-  camera.aspect = window.innerWidth/window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
+    // Update projectiles
+    for(let i=projectiles.length-1;i>=0;i--){
+      let p = projectiles[i];
+      p.x += 7;
+      // Collision with boss
+      if(p.x < boss.x+boss.width && p.x+p.width > boss.x &&
+         p.y < boss.y+boss.height && p.y+p.height > boss.y){
+        projectiles.splice(i,1);
+        boss.health--;
+        document.getElementById('score').innerText = `Boss Fight! Health: ${boss.health}`;
+        if(boss.health <=0){
+          gameState='won';
+          document.getElementById('score').innerText = `You defeated the boss! 💖`;
+        }
+      } else if(p.x>canvas.width){
+        projectiles.splice(i,1);
+      }
+    }
+  }
+}
+
+// --- Draw ---
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // --- Draw player ---
+  ctx.fillStyle = player.color;
+  ctx.fillRect(player.x, player.y, player.width, player.height);
+
+  // --- Draw memories ---
+  if(gameState==='running'){
+    for(let i=0;i<memoryPositions.length;i++){
+      let mem = memoryPositions[i];
+      ctx.drawImage(memoryImages[i], mem.x, mem.y,30,30);
+    }
+  }
+
+  // --- Draw boss ---
+  if(gameState==='boss' || gameState==='won'){
+    ctx.fillStyle = boss.color;
+    ctx.fillRect(boss.x, boss.y, boss.width, boss.height);
+  }
+
+  // --- Draw projectiles ---
+  ctx.fillStyle='#ff4b7a';
+  ctx.font='20px sans-serif';
+  projectiles.forEach(p => {
+    ctx.fillText(p.text, p.x, p.y+15);
+  });
+}
+
+// --- Main loop ---
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+loop();
 </script>
 </body>
 </html>
