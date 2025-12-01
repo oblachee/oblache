@@ -17,32 +17,36 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/examples/js/controls/PointerLockControls.js"></script>
 <script>
-// --- Basic Three.js scene ---
+// --- Scene setup ---
 let scene = new THREE.Scene();
 scene.background = new THREE.Color(0xfff0f5);
 
 let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+camera.position.set(0,2,5); // move camera above ground and back a bit
+
 let renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 // --- Lighting ---
-let light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+let light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.5);
 scene.add(light);
 
 // --- Ground ---
-let groundGeo = new THREE.PlaneGeometry(100, 100);
+let groundGeo = new THREE.PlaneGeometry(50, 50);
 let groundMat = new THREE.MeshStandardMaterial({color: 0xffe0f0});
 let ground = new THREE.Mesh(groundGeo, groundMat);
 ground.rotation.x = -Math.PI/2;
+ground.position.y = 0;
 scene.add(ground);
 
-// --- Player controls ---
+// --- Pointer lock controls ---
 let controls = new THREE.PointerLockControls(camera, document.body);
 document.body.addEventListener('click', () => { controls.lock(); });
 
 let move = {forward:0, backward:0, left:0, right:0};
 let velocity = new THREE.Vector3();
+
 document.addEventListener('keydown', (e)=> {
   if(e.code==='KeyW') move.forward=1;
   if(e.code==='KeyS') move.backward=1;
@@ -78,6 +82,7 @@ function animate(){
   requestAnimationFrame(animate);
   let delta = clock.getDelta();
 
+  // Move player
   velocity.set(0,0,0);
   if(move.forward) velocity.z -= 5*delta;
   if(move.backward) velocity.z += 5*delta;
@@ -86,7 +91,7 @@ function animate(){
   controls.moveRight(velocity.x);
   controls.moveForward(velocity.z);
 
-  // Check collision with hearts
+  // Check collisions with hearts
   for(let i=hearts.length-1;i>=0;i--){
     let h = hearts[i];
     if(camera.position.distanceTo(h.position)<1){
@@ -104,7 +109,7 @@ function animate(){
 }
 animate();
 
-// --- Handle window resize ---
+// --- Window resize ---
 window.addEventListener('resize', ()=> {
   camera.aspect = window.innerWidth/window.innerHeight;
   camera.updateProjectionMatrix();
